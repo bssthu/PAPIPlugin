@@ -6,7 +6,6 @@ using System.Linq;
 using PAPIPlugin.Interfaces;
 using PAPIPlugin.Internal;
 using PAPIPlugin.UI;
-using Tac;
 using UnityEngine;
 
 #endregion
@@ -15,11 +14,9 @@ namespace PAPIPlugin.Impl
 {
     public class DefaultLightArrayManager : ILightArrayManager
     {
-        private static KSP.UI.Screens.ApplicationLauncherButton _appButtonStock = null;
+        private KSP.UI.Screens.ApplicationLauncherButton _appButtonStock = null;
 
-        private IButton _blizzy78Button = null;
-
-        private GroupWindow<ILightArrayConfig> _groupWindow;
+        private SettingsPopupDialog _settingsDialog;
 
         private ILightArrayConfig _lightConfig;
 
@@ -79,32 +76,32 @@ namespace PAPIPlugin.Impl
 
         public void InitializeButton()
         {
-            if (LightConfig != null && LightConfig.UseBlizzy78Toolbar && ToolbarManager.ToolbarAvailable)
+            if (LightConfig == null)
             {
-                AddBlizzy78ToolbarButton();
+                return;
             }
-            else
+
+            if (_appButtonStock == null)
             {
-                if (_appButtonStock == null)
-                {
-                    OnGUIAppLauncherReady();
-                }
+                OnGUIAppLauncherReady();
             }
         }
 
         public void Update()
         {
+            if (LightConfig == null)
+            {
+                return;
+            }
+
+            if (_appButtonStock == null)
+            {
+                InitializeButton();
+            }
+
             foreach (var lightGroup in LightConfig.LightArrayGroups)
             {
                 lightGroup.Update();
-            }
-        }
-
-        public void OnGUI()
-        {
-            if (_groupWindow != null)
-            {
-                _groupWindow.OnGUI();
             }
         }
 
@@ -117,30 +114,36 @@ namespace PAPIPlugin.Impl
 
         private void OnGUIAppLauncherReady()
         {
-            if (KSP.UI.Screens.ApplicationLauncher.Ready)
+            if (_appButtonStock != null)
             {
-                _appButtonStock = KSP.UI.Screens.ApplicationLauncher.Instance.AddModApplication(
-                    OnIconClickHandler,
-                    OnIconClickHandler,
-                    DummyVoid,
-                    DummyVoid,
-                    DummyVoid,
-                    DummyVoid,
-                    KSP.UI.Screens.ApplicationLauncher.AppScenes.FLIGHT | KSP.UI.Screens.ApplicationLauncher.AppScenes.SPACECENTER,
-                    (Texture)GameDatabase.Instance.GetTexture("PAPIPlugin/icon_button", false)
-                );
+                return;
             }
-        }
 
-        private void AddBlizzy78ToolbarButton()
-        {
-            if (_blizzy78Button == null)
+            if (!KSP.UI.Screens.ApplicationLauncher.Ready)
             {
-                _blizzy78Button = ToolbarManager.Instance.add("PAPIPlugin", "PAPIPluginSetting");
-                _blizzy78Button.TexturePath = "PAPIPlugin/icon_button24";
-                _blizzy78Button.ToolTip = "PAPIPlugin Setting";
-                _blizzy78Button.Visibility = new GameScenesVisibility(GameScenes.FLIGHT, GameScenes.SPACECENTER);
-                _blizzy78Button.OnClick += (e) => OnIconClickHandler();
+                return;
+            }
+
+            var iconTexture = (Texture)GameDatabase.Instance.GetTexture("PAPIPlugin/icon_button", false);
+            if (iconTexture == null)
+            {
+                Util.LogWarning("Failed to load the stock launcher icon texture PAPIPlugin/icon_button.");
+            }
+
+            _appButtonStock = KSP.UI.Screens.ApplicationLauncher.Instance.AddModApplication(
+                OnIconClickHandler,
+                OnIconClickHandler,
+                DummyVoid,
+                DummyVoid,
+                DummyVoid,
+                DummyVoid,
+                KSP.UI.Screens.ApplicationLauncher.AppScenes.FLIGHT | KSP.UI.Screens.ApplicationLauncher.AppScenes.SPACECENTER,
+                iconTexture
+            );
+
+            if (_appButtonStock != null)
+            {
+                Util.LogInfo("Registered stock launcher button.");
             }
         }
 
@@ -148,34 +151,48 @@ namespace PAPIPlugin.Impl
 
         private void OnIconClickHandler()
         {
-            if (_groupWindow == null)
+            if (_settingsDialog == null)
             {
-                _groupWindow = new GroupWindow<ILightArrayConfig>(LightConfig);
-                _groupWindow.AllLightConfigReloaded += (sender, e) =>
-                    {
-                        LightConfig.Destroy();  // not perfect..
-                        LoadConfig();
-                        _groupWindow.SetVisible(false);
-                        _groupWindow = null;
-                        AllLightConfigReloaded(this, e);
-                    };
-                _groupWindow.AllLightConfigSaved += (sender, e) => SaveConfig();
-                _groupWindow.SetVisible(true);
-            }
-            else
-            {
-                _groupWindow.ToggleVisible();
+                _settingsDialog = new SettingsPopupDialog(() => LightConfig, SaveConfig, ReloadConfigAndRefreshDialog);
             }
 
-            if ((LightConfig != null && !LightConfig.UseBlizzy78Toolbar) || !ToolbarManager.ToolbarAvailable)
+            _settingsDialog.ToggleVisible();
+
+            if (_appButtonStock != null)
             {
                 // Don't lock highlight on the button since it's just a toggle
                 _appButtonStock.SetFalse(false);
             }
         }
 
+        private void ReloadConfigAndRefreshDialog()
+        {
+            if (_settingsDialog != null)
+            {
+                _settingsDialog.Dismiss();
+            }
+
+            if (LightConfig != null)
+            {
+                LightConfig.Destroy();
+            }
+
+            LoadConfig();
+            AllLightConfigReloaded?.Invoke(this, EventArgs.Empty);
+
+            if (_settingsDialog != null)
+            {
+                _settingsDialog.Show();
+            }
+        }
+
         private void InitializeConfig(ILightArrayConfig lightConfig)
         {
+            if (lightConfig == null)
+            {
+                return;
+            }
+
             foreach (var lightArray in lightConfig.LightArrayGroups.SelectMany(group => group.LightArrays))
             {
                 lightArray.InitializeDisplay(this);
@@ -198,23 +215,21 @@ namespace PAPIPlugin.Impl
 
         protected virtual void Dispose(bool disposing)
         {
-            LightConfig.Destroy();
-
-            if (_blizzy78Button != null)
+            if (LightConfig != null)
             {
-                _blizzy78Button.Destroy();
-                _blizzy78Button = null;
+                LightConfig.Destroy();
             }
+
             if (_appButtonStock != null)
             {
                 KSP.UI.Screens.ApplicationLauncher.Instance.RemoveModApplication(_appButtonStock);
                 _appButtonStock = null;
             }
 
-            if (_groupWindow != null)
+            if (_settingsDialog != null)
             {
-                _groupWindow.SetVisible(false);
-                _groupWindow = null;
+                _settingsDialog.Dismiss();
+                _settingsDialog = null;
             }
         }
     }

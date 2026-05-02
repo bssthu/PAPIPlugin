@@ -142,12 +142,9 @@ namespace PAPIPlugin.Impl
             return newManager;
         }
 
-        public void OnGui(int windowId)
+        public IEnumerable<DialogGUIBase> BuildDialogItems()
         {
-            foreach (var lightTypeManager in _managers.Values)
-            {
-                lightTypeManager.OnGui(windowId);
-            }
+            return _managers.Values.SelectMany(lightTypeManager => lightTypeManager.BuildDialogItems());
         }
 
         public void Destroy()

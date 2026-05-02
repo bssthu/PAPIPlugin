@@ -28,6 +28,10 @@ namespace PAPIPlugin.Arrays
 
         private GameObject[] _partObjects;
 
+        private Renderer[] _partRenderers;
+
+        private Light[] _fallbackLights;
+
         private Vector3d _relativeSurfacePosition;
 
         public PAPIArray()
@@ -38,6 +42,11 @@ namespace PAPIPlugin.Arrays
             EnabledChanged += (sender, args) =>
             {
                 if (Enabled)
+                {
+                    return;
+                }
+
+                if (_partObjects == null)
                 {
                     return;
                 }
@@ -103,12 +112,18 @@ namespace PAPIPlugin.Arrays
 
         public override void Destroy()
         {
-            foreach (var partObject in _partObjects)
+            if (_partObjects != null)
             {
-                Object.Destroy(partObject);
+                foreach (var partObject in _partObjects)
+                {
+                    Object.Destroy(partObject);
+                }
             }
 
-            Object.Destroy(_papiGameObject);
+            if (_papiGameObject != null)
+            {
+                Object.Destroy(_papiGameObject);
+            }
 
             base.Destroy();
         }
@@ -190,12 +205,10 @@ namespace PAPIPlugin.Arrays
         {
             var parentBody = ParentGroup.ParentBody;
 
-            var pqs = parentBody.pqsController;
-
             var surfaceNormal = parentBody.transform.InverseTransformDirection(parentBody.GetSurfaceNVector(lat, lon));
-            var zeroAltSurface = pqs.transform.InverseTransformPoint(parentBody.GetWorldSurfacePosition(lat, lon, 0));
+            var zeroAltSurface = parentBody.transform.InverseTransformPoint(parentBody.GetWorldSurfacePosition(lat, lon, 0));
 
-            var north = Vector3.up * (float) pqs.radius; // We are in local space so up * radius is the north pole
+            var north = Vector3.up * (float) parentBody.Radius; // In body local space, up * radius is the north pole
 
             var directionToNorth = (north - zeroAltSurface).normalized;
 
@@ -212,9 +225,11 @@ namespace PAPIPlugin.Arrays
 
             var maxHeight = double.MinValue;
             _partObjects = new GameObject[PartCount];
+            _partRenderers = new Renderer[PartCount];
+            _fallbackLights = new Light[PartCount];
             for (var i = 0; i < PartCount; i++)
             {
-                var obj = AddPAPIPart();
+                var obj = AddPAPIPart(i);
 
                 obj.transform.parent = _papiGameObject.transform;
                 obj.transform.localPosition = GetLocalLighPosition(i);
@@ -254,17 +269,39 @@ namespace PAPIPlugin.Arrays
             return direction - Vector3d.Dot(firstVector, direction) * firstVector;
         }
 
-        private GameObject AddPAPIPart()
+        private GameObject AddPAPIPart(int index)
         {
+            var lightMaterial = CreateLightMaterial();
             var obj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            obj.name = string.Format("PAPIPart{0}", index);
 
-            var material = new Material(Shader.Find("Particles/Additive"));
-            obj.GetComponent<Renderer>().sharedMaterial = material;
+            var renderer = obj.GetComponent<Renderer>();
+            if (lightMaterial != null)
+            {
+                renderer.sharedMaterial = lightMaterial;
+            }
+            else
+            {
+                renderer.enabled = false;
+
+                var pointLight = obj.AddComponent<Light>();
+                pointLight.type = LightType.Point;
+                pointLight.range = Mathf.Max(LightRadius * 4.0f, 16.0f);
+                pointLight.intensity = 2.0f;
+                pointLight.shadows = LightShadows.None;
+
+                _fallbackLights[index] = pointLight;
+            }
 
             obj.transform.localScale = new Vector3(LightRadius, LightRadius, LightRadius);
 
             var sphereCollider = obj.GetComponent<SphereCollider>();
-            sphereCollider.enabled = false;
+            if (sphereCollider != null)
+            {
+                sphereCollider.enabled = false;
+            }
+
+            _partRenderers[index] = renderer;
 
             return obj;
         }
@@ -272,11 +309,81 @@ namespace PAPIPlugin.Arrays
         private void UpdatePAPIPart(int index, double difference, float alpha)
         {
             var gameObj = _partObjects[index];
+            var renderer = _partRenderers[index];
+            var fallbackLight = _fallbackLights[index];
 
             var color = GetArrayPartColor(index, difference);
             color.a = alpha;
 
-            gameObj.GetComponent<Renderer>().material.SetColor("_TintColor", color);
+            if (renderer != null && renderer.enabled)
+            {
+                ApplyColor(renderer.material, color);
+            }
+
+            if (fallbackLight != null)
+            {
+                fallbackLight.color = color;
+                fallbackLight.intensity = Mathf.Lerp(0.25f, 2.0f, alpha);
+            }
+        }
+
+        private static void ApplyColor(Material material, Color color)
+        {
+            if (material == null)
+            {
+                return;
+            }
+
+            if (material.HasProperty("_TintColor"))
+            {
+                material.SetColor("_TintColor", color);
+            }
+
+            if (material.HasProperty("_Color"))
+            {
+                material.SetColor("_Color", color);
+            }
+
+            if (material.HasProperty("_EmissionColor"))
+            {
+                material.SetColor("_EmissionColor", color);
+            }
+        }
+
+        private static Material CreateLightMaterial()
+        {
+            var shader = FindLightShader();
+            if (shader == null)
+            {
+                Util.LogWarning("No supported light shader was found. Falling back to point lights only.");
+                return null;
+            }
+
+            return new Material(shader);
+        }
+
+        private static Shader FindLightShader()
+        {
+            var shaderNames = new[]
+            {
+                "Particles/Additive",
+                "Legacy Shaders/Particles/Additive",
+                "Particles/Standard Unlit",
+                "Unlit/Color",
+                "Legacy Shaders/Self-Illumin/Diffuse"
+            };
+
+            foreach (var shaderName in shaderNames)
+            {
+                var shader = Shader.Find(shaderName);
+                if (shader != null)
+                {
+                    Util.LogInfo(string.Format("Using shader {0} for PAPI lights.", shaderName));
+                    return shader;
+                }
+            }
+
+            return null;
         }
 
         private Color GetArrayPartColor(int index, double difference)

@@ -19,7 +19,5 @@ namespace PAPIPlugin.Interfaces
         void InitializeButton();
 
         void Update();
-
-        void OnGUI();
     }
 }

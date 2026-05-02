@@ -22,9 +22,8 @@ namespace PAPIPlugin
     public class PAPIAddon : MonoBehaviour
     {
         private ILightArrayManager _arrayManager;
-        private Callback postDrawCallbacks;
 
-        private static ILightArrayConfig _config;
+        private ILightArrayConfig _config;
 
         public void Awake()
         {
@@ -32,18 +31,10 @@ namespace PAPIPlugin
 
             _arrayManager = new DefaultLightArrayManager();
             _arrayManager.AllLightConfigReloaded += (sender, e) => _config = _arrayManager.LightConfig;
-
-            if (_config == null)
-            {
-                _config = _arrayManager.LoadConfig();
-            }
-            else
-            {
-                _arrayManager.LightConfig = _config;
-            }
+            _config = _arrayManager.LoadConfig();
 
             GameEvents.onGUIApplicationLauncherReady.Add(_arrayManager.InitializeButton);
-            postDrawCallbacks = new Callback(_arrayManager.OnGUI);
+            _arrayManager.InitializeButton();
         }
 
         public void Update()
@@ -51,14 +42,6 @@ namespace PAPIPlugin
             if (_arrayManager != null)
             {
                 _arrayManager.Update();
-            }
-        }
-
-        public void OnGUI()
-        {
-            if (postDrawCallbacks != null)
-            {
-                postDrawCallbacks();
             }
         }
 

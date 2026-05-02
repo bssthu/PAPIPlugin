@@ -2,12 +2,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using PAPIPlugin.Arrays;
 using PAPIPlugin.Interfaces;
 using PAPIPlugin.Internal;
-using PAPIPlugin.UI;
-using UnityEngine;
 
 #endregion
 
@@ -17,15 +16,15 @@ namespace PAPIPlugin.Impl
     {
         private readonly IList<PAPIArray> _papiArrays = new List<PAPIArray>();
 
-        private EditableGUIField<double> _glideslopeField;
-
-        private EditableGUIField<double> _glideslopeToleranceField;
-
-        private bool _guiInitialized = false;
-
         private double _initialGlideslopeValue = PAPIArray.DefaultTargetGlidePath;
 
         private double _initialTargetGlideslopeValue = PAPIArray.DefaultGlideslopeTolerance;
+
+        private string _glideslopeText;
+
+        private string _glideslopeToleranceText;
+
+        private string _validationMessage = string.Empty;
 
         #region ILightTypeManager Members
 
@@ -56,67 +55,83 @@ namespace PAPIPlugin.Impl
                 };
         }
 
-        public void OnGui(int windowID)
+        public IEnumerable<DialogGUIBase> BuildDialogItems()
         {
-            if (!_guiInitialized)
+            EnsureDialogState();
+
+            return new DialogGUIBase[]
             {
-                _glideslopeField = new EditableGUIField<double>(_initialGlideslopeValue, DoubleConvertDelegate);
-                _glideslopeToleranceField = new EditableGUIField<double>(_initialTargetGlideslopeValue, DoubleConvertDelegate);
-
-                _guiInitialized = true;
-            }
-
-            DoDegreeField("Glideslope", _glideslopeField);
-            DoDegreeField("Glideslope tolerance", _glideslopeToleranceField);
-
-            ApplyValues();
+                CreateDegreeInputRow("Glideslope", _glideslopeText, UpdateGlideslopeText),
+                CreateDegreeInputRow("Glideslope tolerance", _glideslopeToleranceText, UpdateGlideslopeToleranceText),
+                new DialogGUILabel(() => _validationMessage, true, false)
+            };
         }
 
         #endregion
 
-        private static void DoDegreeField<T>(string name, EditableGUIField<T> field)
+        private void EnsureDialogState()
         {
-            GUILayout.BeginHorizontal();
+            if (_papiArrays.Count > 0)
             {
-                GUILayout.Label(name + ":");
-                field.LayoutTextField();
-                GUILayout.Label("°");
+                _glideslopeText = _papiArrays[0].TargetGlideslope.ToString(CultureInfo.InvariantCulture);
+                _glideslopeToleranceText = _papiArrays[0].GlideslopeTolerance.ToString(CultureInfo.InvariantCulture);
+                return;
             }
-            GUILayout.EndHorizontal();
-        }
 
-        private static string DoubleConvertDelegate(string input, out double val)
-        {
-            val = 0;
-
-            try
+            if (string.IsNullOrEmpty(_glideslopeText))
             {
-                val = double.Parse(input);
-                return null;
+                _glideslopeText = _initialGlideslopeValue.ToString(CultureInfo.InvariantCulture);
             }
-            catch (FormatException e)
+
+            if (string.IsNullOrEmpty(_glideslopeToleranceText))
             {
-                return string.Format("Failed to convert \"{0}\" to double: {1}", input, e.Message);
+                _glideslopeToleranceText = _initialTargetGlideslopeValue.ToString(CultureInfo.InvariantCulture);
             }
         }
 
-        private void ApplyValues()
+        private static DialogGUIBase CreateDegreeInputRow(string label, string currentValue, Func<string, string> onTextUpdated)
         {
-            if (!_glideslopeField.InvalidInput)
+            return new DialogGUIHorizontalLayout(
+                new DialogGUILabel(label, 180f, 30f),
+                new DialogGUITextInput(currentValue, false, 24, onTextUpdated, 120f, 30f),
+                new DialogGUILabel("deg", 40f, 30f));
+        }
+
+        private string UpdateGlideslopeText(string input)
+        {
+            _glideslopeText = input;
+            return UpdateAllArrays(input, (papiArray, value) => papiArray.TargetGlideslope = value, "Invalid glideslope value.");
+        }
+
+        private string UpdateGlideslopeToleranceText(string input)
+        {
+            _glideslopeToleranceText = input;
+            return UpdateAllArrays(input, (papiArray, value) => papiArray.GlideslopeTolerance = value, "Invalid glideslope tolerance value.");
+        }
+
+        private string UpdateAllArrays(string input, Action<PAPIArray, double> applyValue, string errorMessage)
+        {
+            double parsedValue;
+            if (!TryParseDouble(input, out parsedValue))
             {
-                foreach (var papiArray in _papiArrays)
-                {
-                    papiArray.TargetGlideslope = _glideslopeField.Value;
-                }
+                _validationMessage = errorMessage;
+                return input;
             }
 
-            if (!_glideslopeToleranceField.InvalidInput)
+            _validationMessage = string.Empty;
+            foreach (var papiArray in _papiArrays)
             {
-                foreach (var papiArray in _papiArrays)
-                {
-                    papiArray.GlideslopeTolerance = _glideslopeToleranceField.Value;
-                }
+                applyValue(papiArray, parsedValue);
             }
+
+            return input;
         }
+
+        private static bool TryParseDouble(string input, out double value)
+        {
+            return double.TryParse(input, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out value) ||
+                   double.TryParse(input, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out value);
+        }
+
     }
 }

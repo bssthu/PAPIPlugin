@@ -13,19 +13,25 @@ The array will show two red and two white lights when following correct glide sl
 
 Building
 ----------
-First add an environment variable with the name *KSP_PATH*
-which contains the path to your KSP install where the plugin should be deployed to.
+This fork builds against Kerbal Space Program 1.12.x.
 
-Then open the visual studio solution.
-You will need to add the assemblies
-**UnityEngine**, **KSPUtil**, **Assembly-CSharp-firstpass** and **Assembly-CSharp**
-from *<KSP_PATH>/KSP_x64_Data/Managed* to the references of the project.
-After that either directly run or build the solition.
+1. Add an environment variable named *KSP_PATH* that points to your KSP install root.
+2. Open the solution in Visual Studio or build it with MSBuild.
+3. Build the *Release* configuration.
+
+The project already references the required KSP and Unity assemblies from *<KSP_PATH>/KSP_x64_Data/Managed*.
+The built DLL is copied to *assets/GameData/PAPIPlugin/Plugins* during the build.
+
+Installation
+----------
+Copy the contents of *assets/GameData/PAPIPlugin* to *<KSP>/GameData/PAPIPlugin*.
+
+Notes
+----------
+- The plugin uses the stock KSP application launcher for its settings UI.
 
 Credits
 ----------
-- TaranisElsu - Author of the TacLib library
-
 - asarium - Author of Runway PAPI array
 
 - angavrilov - Contributor of Runway PAPI array

@@ -19,6 +19,6 @@ namespace PAPIPlugin.Interfaces
 
         T GetOrAddTypeManager<T>(Func<T> creatorFunc) where T : ILightTypeManager;
 
-        void OnGui(int windowId);
+        IEnumerable<DialogGUIBase> BuildDialogItems();
     }
 }
