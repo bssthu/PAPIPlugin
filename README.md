@@ -19,8 +19,11 @@ This fork builds against Kerbal Space Program 1.12.x.
 2. Open the solution in Visual Studio or build it with MSBuild.
 3. Build the *Release* configuration.
 
-The project already references the required KSP and Unity assemblies from *<KSP_PATH>/KSP_x64_Data/Managed*.
+The project references the required KSP and Unity assemblies from *<KSP_PATH>/KSP_x64_Data/Managed*
+on Windows installs or *<KSP_PATH>/KSP_Data/Managed* on Linux installs.
+The *KSPDIR*, *KSP_DIR*, and *KSPManagedDir* MSBuild properties are also supported.
 The built DLL is copied to *assets/GameData/PAPIPlugin/Plugins* during the build.
+Pass */p:RunPostBuildCopy=false* for a compile-only build that skips the local copy step.
 
 Installation
 ----------

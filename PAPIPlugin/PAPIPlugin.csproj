@@ -12,6 +12,12 @@
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
+    <KSP_PATH Condition=" '$(KSP_PATH)' == '' and '$(KSPDIR)' != '' ">$(KSPDIR)</KSP_PATH>
+    <KSP_PATH Condition=" '$(KSP_PATH)' == '' and '$(KSP_DIR)' != '' ">$(KSP_DIR)</KSP_PATH>
+    <KSPManagedDir Condition=" '$(KSPManagedDir)' == '' and '$(KSP_PATH)' != '' and Exists('$(KSP_PATH)/KSP_x64_Data/Managed/Assembly-CSharp.dll') ">$(KSP_PATH)/KSP_x64_Data/Managed</KSPManagedDir>
+    <KSPManagedDir Condition=" '$(KSPManagedDir)' == '' and '$(KSP_PATH)' != '' and Exists('$(KSP_PATH)/KSP_Data/Managed/Assembly-CSharp.dll') ">$(KSP_PATH)/KSP_Data/Managed</KSPManagedDir>
+    <KSPManagedDir Condition=" '$(KSPManagedDir)' == '' ">$(KSP_PATH)/KSP_x64_Data/Managed</KSPManagedDir>
+    <RunPostBuildCopy Condition=" '$(RunPostBuildCopy)' == '' ">true</RunPostBuildCopy>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -36,54 +42,54 @@
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(KSP_PATH)/KSP_x64_Data/Managed/Assembly-CSharp.dll</HintPath>
+      <HintPath>$(KSPManagedDir)/Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Assembly-CSharp-firstpass">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(KSP_PATH)/KSP_x64_Data/Managed/Assembly-CSharp-firstpass.dll</HintPath>
+      <HintPath>$(KSPManagedDir)/Assembly-CSharp-firstpass.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="UnityEngine">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(KSP_PATH)/KSP_x64_Data/Managed/UnityEngine.dll</HintPath>
+      <HintPath>$(KSPManagedDir)/UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(KSP_PATH)/KSP_x64_Data/Managed/UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(KSPManagedDir)/UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(KSP_PATH)/KSP_x64_Data/Managed/UnityEngine.IMGUIModule.dll</HintPath>
+      <HintPath>$(KSPManagedDir)/UnityEngine.IMGUIModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(KSP_PATH)/KSP_x64_Data/Managed/UnityEngine.TextRenderingModule.dll</HintPath>
+      <HintPath>$(KSPManagedDir)/UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.ImageConversionModule">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(KSP_PATH)/KSP_x64_Data/Managed/UnityEngine.ImageConversionModule.dll</HintPath>
+      <HintPath>$(KSPManagedDir)/UnityEngine.ImageConversionModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.InputLegacyModule">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(KSP_PATH)/KSP_x64_Data/Managed/UnityEngine.InputLegacyModule.dll</HintPath>
+      <HintPath>$(KSPManagedDir)/UnityEngine.InputLegacyModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.PhysicsModule">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(KSP_PATH)/KSP_x64_Data/Managed/UnityEngine.PhysicsModule.dll</HintPath>
+      <HintPath>$(KSPManagedDir)/UnityEngine.PhysicsModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.AnimationModule">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(KSP_PATH)/KSP_x64_Data/Managed/UnityEngine.AnimationModule.dll</HintPath>
+      <HintPath>$(KSPManagedDir)/UnityEngine.AnimationModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
@@ -111,7 +117,11 @@
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <PropertyGroup>
+  <Target Name="ValidateKSPReferences" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(KSPManagedDir)/Assembly-CSharp.dll')" Text="KSP reference not found: $(KSPManagedDir)/Assembly-CSharp.dll. Set KSP_PATH, KSPDIR, KSP_DIR, or pass /p:KSPManagedDir=... to the build." />
+    <Error Condition="!Exists('$(KSPManagedDir)/UnityEngine.dll')" Text="KSP reference not found: $(KSPManagedDir)/UnityEngine.dll. Set KSP_PATH, KSPDIR, KSP_DIR, or pass /p:KSPManagedDir=... to the build." />
+  </Target>
+  <PropertyGroup Condition=" '$(RunPostBuildCopy)' != 'false' ">
     <PostBuildEvent>mkdir "$(SolutionDir)assets/GameData/PAPIPlugin/Plugins"
 xcopy /Y /I "$(TargetPath)" "$(SolutionDir)assets/GameData/PAPIPlugin/Plugins"</PostBuildEvent>
   </PropertyGroup>

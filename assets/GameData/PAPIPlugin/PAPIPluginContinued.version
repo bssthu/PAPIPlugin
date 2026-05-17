@@ -6,7 +6,7 @@
     {
         "USERNAME":"bssthu",
         "REPOSITORY":"PAPIPlugin",
-        "ALLOW_PRE_RELEASE":true,
+        "ALLOW_PRE_RELEASE":true
     },
     "VERSION":
     {
@@ -33,4 +33,4 @@
         "MINOR":12,
         "PATCH":99
     }
-} 
+}
